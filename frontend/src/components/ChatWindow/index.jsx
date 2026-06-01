@@ -19,7 +19,7 @@ export default function ChatWindow({ project, onBack }) {
           {
             role: 'assistant',
             text: r.answer,
-            sourceLaws: r.source_law_ids ?? [],
+            sourceLaws: [],
             confidence: r.confidence,
             id: `a-${r.id}`,
           },
@@ -70,7 +70,7 @@ export default function ChatWindow({ project, onBack }) {
         {
           role: 'assistant',
           text: data.answer,
-          sourceLaws: data.source_law_ids ?? [],
+          sourceLaws: data.source_laws ?? [],
           confidence: data.confidence,
           id: data.history_id,
         },
@@ -167,6 +167,28 @@ export default function ChatWindow({ project, onBack }) {
   )
 }
 
+function SourceLaw({ law }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="border border-slate-200 rounded-lg text-xs overflow-hidden">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+      >
+        <span className="text-slate-600 font-medium leading-snug">
+          {law.title} / {law.article_no}
+        </span>
+        <span className="text-slate-400 shrink-0">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="px-3 py-2.5 text-slate-500 leading-relaxed whitespace-pre-wrap border-t border-slate-100 bg-white">
+          {law.content}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Message({ msg }) {
   const isUser = msg.role === 'user'
   return (
@@ -185,21 +207,14 @@ function Message({ msg }) {
           {msg.text}
         </div>
 
-        {/* 출처 조문 */}
         {msg.sourceLaws && msg.sourceLaws.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {msg.sourceLaws.map(id => (
-              <span
-                key={id}
-                className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full"
-              >
-                조문 #{id}
-              </span>
+          <div className="flex flex-col gap-1.5 w-full">
+            {msg.sourceLaws.map(law => (
+              <SourceLaw key={law.id} law={law} />
             ))}
           </div>
         )}
 
-        {/* 신뢰도 */}
         {msg.confidence != null && (
           <p className="text-xs text-slate-400">신뢰도 {msg.confidence}/5</p>
         )}
