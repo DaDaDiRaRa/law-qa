@@ -1,0 +1,289 @@
+{
+  "_comment": "주차장법 시행령 [별표 1] + 주택건설기준 등에 관한 규정 §27 기준. 지자체 조례 강화는 미반영 (사용자 수동 override 필요).",
+  "version": "v2.0",
+  "last_updated": "2026-05-14",
+  "law_ref": "주차장법 시행령 별표 1, 주택건설기준 등에 관한 규정 §27",
+  "standards": {
+    "단독주택": {
+      "type": "cumulative",
+      "exempt_max_m2": 50,
+      "single_unit_max_m2": 150,
+      "incremental_unit_m2": 100,
+      "note": "시설면적 50㎡ 이하 면제 / 50~150㎡: 1대 / 150㎡ 초과: 1대 + 150㎡ 초과분 100㎡당 1대 (누적식)"
+    },
+    "다가구주택": {
+      "type": "unit_based",
+      "thresholds": [
+        {"max_exclusive_area": 60, "ratio": 0.7},
+        {"max_exclusive_area": null, "ratio": 1.0}
+      ],
+      "note": "1세대당 1대(전용면적 60㎡ 이하는 0.7대) — 주택건설기준규정 §27"
+    },
+    "공동주택": {
+      "type": "unit_based",
+      "thresholds": [
+        {"max_exclusive_area": 60, "ratio": 0.7},
+        {"max_exclusive_area": null, "ratio": 1.0}
+      ],
+      "note": "1세대당 1대(전용면적 60㎡ 이하는 0.7대) — 주택건설기준규정 §27 (기숙사 제외). 지자체 조례로 강화 가능."
+    },
+    "다세대주택": {
+      "type": "unit_based",
+      "thresholds": [
+        {"max_exclusive_area": 60, "ratio": 0.7},
+        {"max_exclusive_area": null, "ratio": 1.0}
+      ],
+      "note": "1세대당 1대(전용 60㎡ 이하는 0.7대) — 주택건설기준규정 §27 준용"
+    },
+    "연립주택": {
+      "type": "unit_based",
+      "thresholds": [
+        {"max_exclusive_area": 60, "ratio": 0.7},
+        {"max_exclusive_area": null, "ratio": 1.0}
+      ],
+      "note": "1세대당 1대(전용 60㎡ 이하는 0.7대) — 주택건설기준규정 §27 준용"
+    },
+    "오피스텔": {
+      "type": "unit_based",
+      "thresholds": [
+        {"max_exclusive_area": 60, "ratio": 0.7},
+        {"max_exclusive_area": null, "ratio": 1.0}
+      ],
+      "note": "1호당 1대(전용 60㎡ 이하는 0.7대) — 주택건설기준규정 §27"
+    },
+    "제1종근린생활시설": {
+      "type": "area_based",
+      "unit_area": 200,
+      "min_units": 0,
+      "note": "시설면적 200㎡당 1대 — 시행령 별표 1 (목욕장·종교집회장·납골당 제외)"
+    },
+    "제2종근린생활시설": {
+      "type": "area_based",
+      "unit_area": 200,
+      "min_units": 0,
+      "note": "시설면적 200㎡당 1대 — 시행령 별표 1 (목욕장·예식장 제외)"
+    },
+    "근린생활시설": {
+      "type": "area_based",
+      "unit_area": 200,
+      "min_units": 0,
+      "note": "시설면적 200㎡당 1대 — 시행령 별표 1"
+    },
+    "업무시설": {
+      "type": "area_based",
+      "unit_area": 150,
+      "min_units": 0,
+      "note": "시설면적 150㎡당 1대 — 시행령 별표 1 (외국공관·오피스텔 제외)"
+    },
+    "판매시설": {
+      "type": "area_based",
+      "unit_area": 150,
+      "min_units": 0,
+      "note": "시설면적 150㎡당 1대 — 시행령 별표 1"
+    },
+    "운수시설": {
+      "type": "area_based",
+      "unit_area": 150,
+      "min_units": 0,
+      "note": "시설면적 150㎡당 1대 — 시행령 별표 1"
+    },
+    "숙박시설": {
+      "type": "area_based",
+      "unit_area": 200,
+      "min_units": 0,
+      "note": "시설면적 200㎡당 1대 — 시행령 별표 1"
+    },
+    "관광숙박시설": {
+      "type": "area_based",
+      "unit_area": 200,
+      "min_units": 0,
+      "note": "시설면적 200㎡당 1대 — 시행령 별표 1 (숙박시설 준용)"
+    },
+    "의료시설": {
+      "type": "area_based",
+      "unit_area": 150,
+      "min_units": 0,
+      "note": "시설면적 150㎡당 1대 — 시행령 별표 1 (정신·요양·격리병원 제외)"
+    },
+    "교육연구시설": {
+      "type": "area_based",
+      "unit_area": 200,
+      "min_units": 0,
+      "note": "시설면적 200㎡당 1대 — 학교 등은 지자체 조례 별도 산정"
+    },
+    "문화및집회시설": {
+      "type": "area_based",
+      "unit_area": 150,
+      "min_units": 0,
+      "note": "시설면적 150㎡당 1대 — 시행령 별표 1 (공연장·집회장·관람장 한정. 관람장 일부는 별도 산정)"
+    },
+    "종교시설": {
+      "type": "area_based",
+      "unit_area": 150,
+      "min_units": 0,
+      "note": "시설면적 150㎡당 1대 — 시행령 별표 1"
+    },
+    "운동시설": {
+      "type": "area_based",
+      "unit_area": 150,
+      "min_units": 0,
+      "note": "시설면적 150㎡당 1대 — 시행령 별표 1 (골프장·골프연습장·옥외수영장·관람장 제외)"
+    },
+    "위락시설": {
+      "type": "area_based",
+      "unit_area": 100,
+      "min_units": 0,
+      "note": "시설면적 100㎡당 1대 — 시행령 별표 1"
+    },
+    "장례식장": {
+      "type": "area_based",
+      "unit_area": 150,
+      "min_units": 0,
+      "note": "시설면적 150㎡당 1대 — 시행령 별표 1"
+    },
+    "방송통신시설": {
+      "type": "area_based",
+      "unit_area": 150,
+      "min_units": 0,
+      "note": "시설면적 150㎡당 1대 — 시행령 별표 1 (방송국 등)"
+    },
+    "수련시설": {
+      "type": "area_based",
+      "unit_area": 350,
+      "min_units": 0,
+      "note": "시설면적 350㎡당 1대 — 시행령 별표 1"
+    },
+    "발전시설": {
+      "type": "area_based",
+      "unit_area": 350,
+      "min_units": 0,
+      "note": "시설면적 350㎡당 1대 — 시행령 별표 1"
+    },
+    "창고시설": {
+      "type": "area_based",
+      "unit_area": 400,
+      "min_units": 0,
+      "note": "시설면적 400㎡당 1대 — 시행령 별표 1"
+    },
+    "공장": {
+      "type": "area_based",
+      "unit_area": 350,
+      "min_units": 0,
+      "note": "시설면적 350㎡당 1대 — 시행령 별표 1 (아파트형공장 제외)"
+    },
+    "지식산업센터": {
+      "type": "area_based",
+      "unit_area": 350,
+      "min_units": 0,
+      "note": "시설면적 350㎡당 1대 — 시행령 별표 1 (아파트형공장·지식산업센터 준용)"
+    },
+    "노유자시설": {
+      "type": "area_based",
+      "unit_area": 350,
+      "min_units": 0,
+      "note": "시설면적 350㎡당 1대 — 시행령 별표 1"
+    },
+    "관광휴게시설": {
+      "type": "area_based",
+      "unit_area": 200,
+      "min_units": 0,
+      "note": "시설면적 200㎡당 1대 — 시행령 별표 1"
+    },
+    "야영장시설": {
+      "type": "area_based",
+      "unit_area": 350,
+      "min_units": 0,
+      "note": "시설면적 350㎡당 1대 — 시행령 별표 1 준용"
+    },
+    "동물 및 식물 관련 시설": {
+      "type": "area_based",
+      "unit_area": 350,
+      "min_units": 0,
+      "note": "시설면적 350㎡당 1대 — 시행령 별표 1"
+    },
+    "묘지관련시설": {
+      "type": "area_based",
+      "unit_area": 300,
+      "min_units": 0,
+      "note": "시설면적 300㎡당 1대 — 시행령 별표 1"
+    },
+    "자동차관련시설": {
+      "type": "area_based",
+      "unit_area": 400,
+      "min_units": 0,
+      "note": "시설면적 400㎡당 1대 — 시행령 별표 1 (주차장·세차장 등)"
+    },
+    "골프연습장": {
+      "type": "count_based",
+      "count_unit": "타석",
+      "rate": 1,
+      "note": "1타석당 1대 — 주차장법 시행령 별표 1 제6호"
+    },
+    "골프장": {
+      "type": "count_based",
+      "count_unit": "홀",
+      "rate": 10,
+      "note": "1홀당 10대 — 주차장법 시행령 별표 1 제6호"
+    },
+    "옥외수영장": {
+      "type": "count_based",
+      "count_unit": "정원",
+      "rate_per": 15,
+      "rate": 1,
+      "note": "정원 15명당 1대 — 주차장법 시행령 별표 1 제6호"
+    },
+    "관람장": {
+      "type": "count_based",
+      "count_unit": "정원",
+      "rate_per": 100,
+      "rate": 1,
+      "note": "정원 100명당 1대 — 주차장법 시행령 별표 1 제6호"
+    },
+    "학생용기숙사": {
+      "type": "area_based",
+      "unit_area": 400,
+      "min_units": 0,
+      "note": "시설면적 400㎡당 1대 — 주차장법 시행령 별표 1 제9호"
+    },
+    "데이터센터": {
+      "type": "area_based",
+      "unit_area": 400,
+      "min_units": 0,
+      "note": "시설면적 400㎡당 1대 — 주차장법 시행령 별표 1 제10호 (방송통신시설 중 데이터센터)"
+    }
+  },
+  "default": {
+    "type": "area_based",
+    "unit_area": 300,
+    "min_units": 0,
+    "note": "그 밖의 건축물 시설면적 300㎡당 1대 — 시행령 별표 1 (보충)"
+  },
+  "aliases": {
+    "아파트": "공동주택",
+    "빌라": "다세대주택",
+    "연립": "연립주택",
+    "다가구": "다가구주택",
+    "단독": "단독주택",
+    "제1종근린": "제1종근린생활시설",
+    "제2종근린": "제2종근린생활시설",
+    "1종근린생활시설": "제1종근린생활시설",
+    "2종근린생활시설": "제2종근린생활시설",
+    "근린생활": "근린생활시설",
+    "문화집회시설": "문화및집회시설",
+    "문화및집회": "문화및집회시설",
+    "동물식물관련시설": "동물 및 식물 관련 시설",
+    "동물및식물관련시설": "동물 및 식물 관련 시설",
+    "학생기숙사": "학생용기숙사",
+    "기숙사": "학생용기숙사"
+  },
+  "excluded_uses": {
+    "목욕장": "제1종근린생활시설에서 제외(별표 1)되어 별도 기준 적용 — 법령 원문 확인 필요",
+    "납골당": "제1종근린생활시설에서 제외(별표 1)되어 별도 기준 적용 — 법령 원문 확인 필요",
+    "예식장": "제2종근린생활시설에서 제외(별표 1)되어 별도 기준 적용 — 법령 원문 확인 필요",
+    "정신병원": "의료시설에서 제외(별표 1)되어 별도 기준 적용 — 법령 원문 확인 필요",
+    "요양병원": "의료시설에서 제외(별표 1)되어 별도 기준 적용 — 법령 원문 확인 필요",
+    "격리병원": "의료시설에서 제외(별표 1)되어 별도 기준 적용 — 법령 원문 확인 필요",
+    "외국공관": "업무시설에서 제외(별표 1)되어 별도 기준 적용 — 법령 원문 확인 필요",
+    "아파트형공장": "공장에서 제외(별표 1) — 지식산업센터 기준 적용. '지식산업센터'로 재입력 권장"
+  }
+}
