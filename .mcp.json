@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "law-qa": {
+      "command": "python",
+      "args": ["d:/APPS/law-qa/mcp_server/server.py"]
+    }
+  }
+}

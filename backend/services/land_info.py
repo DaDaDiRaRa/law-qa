@@ -6,12 +6,18 @@ LURIS 행위제한 API로 해당 필지의 용도지역 정보를 조회한다.
 
 import json
 import os
+import ssl
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+# 한국 정부 API 서버의 SSL 인증서 호스트명 불일치 우회용
+_SSL_CTX = ssl.create_default_context()
+_SSL_CTX.check_hostname = False
+_SSL_CTX.verify_mode = ssl.CERT_NONE
 
 _BACKEND = Path(__file__).resolve().parent.parent
 if str(_BACKEND) not in sys.path:
@@ -80,7 +86,7 @@ def _zone_from_luris(pnu: str) -> dict:
     qs  = urllib.parse.urlencode({"apiKey": LURIS_API_KEY, "pnu": pnu, "scale": 1000})
     req = urllib.request.Request(f"{_LURIS_URL}?{qs}")
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=10, context=_SSL_CTX) as resp:
             raw = resp.read()
     except urllib.error.URLError as e:
         raise RuntimeError(f"LURIS API 호출 실패: {e}") from e

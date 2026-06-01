@@ -7,9 +7,6 @@ export default function ChatWindow({ project, onProjectChange }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [projects, setProjects] = useState([])
-  const [address, setAddress] = useState('')
-  const [landInfo, setLandInfo] = useState(null)
-  const [landLoading, setLandLoading] = useState(false)
   const bottomRef = useRef(null)
   const fileRef = useRef(null)
 
@@ -44,45 +41,6 @@ export default function ChatWindow({ project, onProjectChange }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
-  async function handleAddressLookup() {
-    const addr = address.trim()
-    if (!addr || landLoading) return
-    setLandLoading(true)
-    try {
-      const res = await fetch(`/api/land-info?address=${encodeURIComponent(addr)}`)
-      const data = await res.json()
-      if (data.error) {
-        setMessages(prev => [...prev, {
-          role: 'system',
-          text: `📍 주소 조회 실패: ${data.error}`,
-          id: `land-err-${Date.now()}`,
-        }])
-      } else {
-        setLandInfo(data)
-        const zoneText = [data.zone_use, data.zone_district, data.zone_area]
-          .filter(Boolean).join(' / ')
-        setMessages(prev => [...prev, {
-          role: 'system',
-          text: `📍 대지 정보 설정됨\n주소: ${data.address}\n용도지역: ${zoneText || '정보 없음 (용도지역 조회 실패)'}`,
-          id: `land-${Date.now()}`,
-        }])
-      }
-    } catch {
-      setMessages(prev => [...prev, {
-        role: 'system',
-        text: '📍 주소 조회 중 오류가 발생했습니다.',
-        id: `land-err-${Date.now()}`,
-      }])
-    } finally {
-      setLandLoading(false)
-    }
-  }
-
-  function clearLandInfo() {
-    setLandInfo(null)
-    setAddress('')
-  }
-
   function handleFile(e) {
     const file = e.target.files[0]
     if (!file) return
@@ -111,7 +69,6 @@ export default function ChatWindow({ project, onProjectChange }) {
           project_id: project.id,
           question: q,
           image_base64: image?.base64 ?? null,
-          land_info: landInfo ?? null,
         }),
       })
       const data = await res.json()
@@ -182,39 +139,6 @@ export default function ChatWindow({ project, onProjectChange }) {
 
       {/* 입력 영역 */}
       <form onSubmit={send} className="border-t border-slate-200 bg-white px-4 py-3 flex flex-col gap-2">
-        {/* 주소 입력 */}
-        <div className="flex gap-2 items-center">
-          <input
-            value={address}
-            onChange={e => setAddress(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddressLookup() } }}
-            placeholder="대지 주소 입력 (선택사항 — 입력 시 용도지역 자동 조회)"
-            className="flex-1 min-w-0 border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-slate-300 placeholder-slate-400"
-          />
-          {landInfo && (
-            <button
-              type="button"
-              onClick={clearLandInfo}
-              className="text-slate-400 hover:text-red-500 px-1 transition-colors shrink-0"
-              title="대지 정보 초기화"
-            >✕</button>
-          )}
-          <button
-            type="button"
-            onClick={handleAddressLookup}
-            disabled={!address.trim() || landLoading}
-            className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors shrink-0"
-          >
-            {landLoading ? '조회 중' : '조회'}
-          </button>
-        </div>
-        {landInfo && (
-          <div className="text-xs bg-blue-50 text-blue-700 rounded-lg px-3 py-1.5 leading-relaxed">
-            📍 {landInfo.address}
-            {landInfo.zone_use && ` — ${[landInfo.zone_use, landInfo.zone_district, landInfo.zone_area].filter(Boolean).join(' / ')}`}
-          </div>
-        )}
-
         {image && (
           <div className="flex items-center gap-2 text-sm text-slate-600 bg-slate-50 rounded-lg px-3 py-2">
             <span>📎 {image.file.name}</span>

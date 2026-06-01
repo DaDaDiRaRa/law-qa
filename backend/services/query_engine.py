@@ -16,13 +16,15 @@ from services.db_manager import get_connection
 _MODEL = "claude-sonnet-4-6"
 _TOP_K = 5
 
-_SYSTEM = """당신은 건축법규 전문 AI 어시스턴트입니다. 반드시 아래 규칙을 따르세요.
+_SYSTEM = """당신은 건축법규를 잘 아는 선배 건축사입니다. 같은 사무소 동료에게 설명하듯 자연스럽고 친근하게 답하세요. 반드시 아래 규칙을 따르세요.
 
 1. [참고 조문] 안의 내용만 근거로 답변합니다. 참고 조문 외의 지식을 추가하지 않습니다.
 2. 조문에 명시된 수치(건폐율·용적률·주차 대수·% 등)는 절대 임의로 변경하지 않고 원문 그대로 인용합니다.
 3. 답변 끝에 "(출처: [법령명] [조문번호])" 형식으로 근거를 반드시 명시합니다.
-4. [참고 조문]에서 답을 찾을 수 없으면 반드시 "현재 DB에서 확인 불가"라고만 답하고 추측하지 않습니다.
-5. [대지 정보]가 제공된 경우 해당 용도지역 기준을 우선 적용합니다."""
+4. [참고 조문]에서 답을 찾을 수 없으면 "현재 DB에서 확인 불가"라는 문장만 출력하고 끝냅니다. 추가 설명·추천·표·목록·외부 기관 안내를 일절 작성하지 않습니다.
+5. [대지 정보]가 제공된 경우 해당 용도지역 기준을 우선 적용합니다.
+6. 조문 밖의 정보(건의·추천·일반 안내·외부 기관 연락처 등)는 어떤 경우에도 추가하지 않습니다.
+7. 말투: 마크다운 표·제목·불릿 과용 금지. 핵심 수치는 굵게 강조하되 문장 흐름 안에 자연스럽게 녹이세요. 짧고 명확하게, 딱딱한 보고서 형식 대신 대화체로 씁니다."""
 
 _DISCLAIMER = "\n\n---\n참고용 정보입니다. 실제 인허가는 담당 건축사 확인 필수."
 
@@ -30,6 +32,13 @@ _client: anthropic.Anthropic | None = None
 
 # 주소 패턴 — 질문 텍스트에서 자동 감지 (시구군 + 동읍면로길)
 _ADDR_RE = re.compile(r'[가-힣]+[시구군]\s*[가-힣]+[동읍면로길]')
+# 번지 — 주소 매칭 직후 붙는 숫자·하이픈·가나다호·공백 후 번지 (예: 3가 385, 385-2, 385가)
+_BUNJI_RE = re.compile(r'^[\d\-가나다라호]+(?:\s+\d+(?:-\d+)?)?')
+# 시/도 접두어 추출 — 주소 매칭 앞 텍스트에서 역방향 탐색
+_SIDO_RE = re.compile(r'[가-힣]+(?:특별시|광역시|특별자치시|특별자치도|도)$')
+# "기본 정보" 성격 질문 감지 키워드 — 용도지역 확인 시 핵심 법규 검색어 자동 추가
+_BASIC_QUERY_KW = {"기본", "정보", "알려", "검토", "어때", "얼마", "가능"}
+_ZONE_EXTRA_KW  = ["건폐율", "용적률", "주차", "높이", "조경"]
 
 # 한국어 조사 — 긴 것 먼저 배치해야 greedy 매칭이 올바르게 동작
 _PARTICLE = re.compile(
@@ -184,18 +193,44 @@ def _build_not_found_message(question: str) -> str:
 
 def answer(question: str, image_base64: str | None = None, land_info: dict | None = None) -> dict:
     # 명시적 land_info 없으면 질문 텍스트에서 주소 패턴 자동 감지
-    if land_info is None and _ADDR_RE.search(question):
-        try:
-            from services.land_info import get_land_info
-            detected = get_land_info(question)
-            if "error" not in detected:
-                land_info = detected
-        except Exception:
-            pass
+    if land_info is None:
+        q_norm = _normalize(question)
+        m = _ADDR_RE.search(q_norm)
+        if m:
+            tail = q_norm[m.end():]
+            번지_m = _BUNJI_RE.match(tail.lstrip())
+            시도_m = _SIDO_RE.search(q_norm[:m.start()].rstrip())
+            city_prefix = (시도_m.group() + " ") if 시도_m else ""
+            addr_for_lookup = (city_prefix + q_norm[m.start():m.end()].strip()
+                               + (" " + 번지_m.group() if 번지_m else ""))
+            try:
+                from services.land_info import get_land_info
+                detected = get_land_info(addr_for_lookup)
+                if "error" not in detected:
+                    land_info = detected
+            except Exception:
+                pass
 
     extra_tokens: list[str] = []
     if land_info and land_info.get("zone_use"):
         extra_tokens.append(land_info["zone_use"])
+    elif land_info and land_info.get("address") and any(kw in question for kw in _BASIC_QUERY_KW):
+        # 주소는 찾았지만 용도지역 조회 실패 — 사용자에게 직접 안내
+        addr = land_info["address"]
+        return {
+            "answer": (
+                f"주소는 찾았는데 ({addr}) 용도지역 자동 조회에 실패했어. "
+                "질문에 용도지역을 직접 포함해서 다시 물어봐.\n\n"
+                "예: '제2종일반주거지역 기준으로 건폐율·용적률 알려줘'\n\n"
+                "용도지역은 토지이음(eum.go.kr) → 해당 주소 검색 → 지역·지구 탭에서 확인할 수 있어."
+                + _DISCLAIMER
+            ),
+            "source_laws": [],
+            "source_law_ids": [],
+            "confidence": None,
+        }
+    if any(kw in question for kw in _BASIC_QUERY_KW):
+        extra_tokens.extend(_ZONE_EXTRA_KW)
 
     laws = _search_laws(question, extra_tokens=extra_tokens or None)
 

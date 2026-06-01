@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import ProjectList from './components/ProjectList'
 import ChatWindow from './components/ChatWindow'
 import HistorySearch from './components/HistorySearch'
+import ComplianceView from './components/ComplianceView'
 
 const DEFAULT_PROJECT_NAME = '기본 프로젝트'
 
@@ -53,6 +54,9 @@ export default function App() {
           <NavBtn active={view === 'search'} onClick={() => setView('search')}>
             히스토리 검색
           </NavBtn>
+          <NavBtn active={view === 'compliance'} onClick={() => setView('compliance')}>
+            종합 검토
+          </NavBtn>
         </nav>
       </header>
 
@@ -71,6 +75,7 @@ export default function App() {
           <ProjectList onSelect={p => { setSelectedProject(p); setView('chat') }} />
         )}
         {view === 'search' && <HistorySearch />}
+        {view === 'compliance' && <ComplianceView />}
       </main>
     </div>
   )

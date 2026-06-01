@@ -99,7 +99,7 @@ def _find_mst(law_name: str) -> str | None:
     root = ET.fromstring(data)
     for elem in root.findall("law"):
         if _t(elem.find("법령명한글")) == law_name:
-            mst = _t(elem.find("MST"))
+            mst = _t(elem.find("법령일련번호")) or _t(elem.find("MST"))
             return mst if mst else None
     return None
 
@@ -115,7 +115,10 @@ def _build_article_no(조번호: str, 조문제목: str, prefix: str = "") -> st
 def _collect_unit(
     unit: ET.Element, prefix: str, title: str, source: str
 ) -> dict | None:
-    조번호   = _t(unit.find("조번호"))
+    if _t(unit.find("조문여부")) not in ("조문", ""):
+        return None
+
+    조번호   = _t(unit.find("조문번호")) or _t(unit.find("조번호"))
     조문제목 = _t(unit.find("조문제목"))
     조문내용 = _t(unit.find("조문내용"))
 
@@ -192,7 +195,7 @@ def fetch_law(law_name: str) -> list[dict]:
         return []
 
     if not mst:
-        print(f"  [{law_name}] 일치하는 법령을 찾을 수 없음 — 건너뜀")
+        print(f"  [{law_name}] 일치하는 법령을 찾을 수 없음 - 건너뜀")
         return []
 
     print(f"  [{law_name}] MST={mst} 전문 수집 중...")
@@ -257,7 +260,7 @@ def main() -> None:
         new_rows = [r for r in all_rows if (r["title"], r["article_no"]) not in existing]
 
         if not new_rows:
-            print(f"\n신규 행 없음 — 전체 {len(all_rows)}건 이미 적재됨")
+            print(f"\n신규 행 없음 - 전체 {len(all_rows)}건 이미 적재됨")
             return
 
         conn.executemany(

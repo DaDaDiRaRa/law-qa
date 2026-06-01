@@ -15,6 +15,7 @@ from services import project_manager as pm
 from services import history_manager as hm
 from services import query_engine as qe
 from services import land_info as li
+from services import compliance_engine as ce
 
 
 @asynccontextmanager
@@ -39,7 +40,6 @@ class QueryRequest(BaseModel):
     project_id: int
     question: str
     image_base64: str | None = None
-    land_info: dict | None = None
 
 
 @app.post("/api/query")
@@ -47,7 +47,7 @@ def run_query(req: QueryRequest):
     if not pm.get(req.project_id):
         raise HTTPException(status_code=404, detail="project not found")
 
-    result = qe.answer(req.question, image_base64=req.image_base64, land_info=req.land_info)
+    result = qe.answer(req.question, image_base64=req.image_base64)
 
     history = hm.save(
         project_id=req.project_id,
@@ -72,6 +72,25 @@ def run_query(req: QueryRequest):
 @app.get("/api/land-info")
 def get_land_info(address: str = Query(..., min_length=1)):
     return li.get_land_info(address)
+
+
+# ── /api/compliance ────────────────────────────────────────────────────────────
+
+class ComplianceRequest(BaseModel):
+    address: str = ""
+    building_use: str = ""
+    total_floor_area: float | None = None
+    floors: int | None = None
+
+
+@app.post("/api/compliance")
+def run_compliance(req: ComplianceRequest):
+    return ce.check(
+        address=req.address,
+        building_use=req.building_use,
+        total_floor_area=req.total_floor_area,
+        floors=req.floors,
+    )
 
 
 # ── /api/projects ──────────────────────────────────────────────────────────────

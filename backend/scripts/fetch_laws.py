@@ -85,7 +85,8 @@ def _find_mst(law_name: str) -> str | None:
     for elem in root.findall("law"):
         name = _t(elem.find("법령명한글"))
         if name == law_name:
-            mst = _t(elem.find("MST"))
+            # 법령 검색 결과의 MST 필드명은 '법령일련번호'
+            mst = _t(elem.find("법령일련번호"))
             return mst if mst else None
     return None
 
@@ -99,7 +100,11 @@ def _build_article_no(조번호: str, 조문제목: str) -> str:
 
 def _collect_unit(unit: ET.Element, prefix: str, title: str, source: str) -> dict | None:
     """조문단위 XML 요소 하나를 dict로 변환."""
-    조번호   = _t(unit.find("조번호"))
+    # 법제처 DRF 법령 서비스 XML: 조문번호(조번호 아님), 조문여부('조문'만 처리)
+    if _t(unit.find("조문여부")) not in ("조문", ""):
+        return None
+
+    조번호   = _t(unit.find("조문번호")) or _t(unit.find("조번호"))
     조문제목 = _t(unit.find("조문제목"))
     조문내용 = _t(unit.find("조문내용"))
 
@@ -182,7 +187,7 @@ def fetch_law(law_name: str) -> list[dict]:
         return []
 
     if not mst:
-        print(f"  [{law_name}] 일치하는 법령을 찾을 수 없음 — 건너뜀")
+        print(f"  [{law_name}] 일치하는 법령을 찾을 수 없음 - 건너뜀")
         return []
 
     print(f"  [{law_name}] MST={mst} 전문 수집 중...")

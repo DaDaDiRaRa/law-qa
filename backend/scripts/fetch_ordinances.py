@@ -46,6 +46,24 @@ ORDIN_PATTERNS = [
     "{sido} 건축위원회 조례",
 ]
 
+# 시군구 단위 목록 (시도 → 시군구 리스트)
+SIGUNGU_BY_SIDO: dict[str, list[str]] = {
+    "서울특별시": [
+        "강남구", "강동구", "강북구", "강서구", "관악구",
+        "광진구", "구로구", "금천구", "노원구", "도봉구",
+        "동대문구", "동작구", "마포구", "서대문구", "서초구",
+        "성동구", "성북구", "송파구", "양천구", "영등포구",
+        "용산구", "은평구", "종로구", "중구", "중랑구",
+    ],
+}
+
+# 시군구 조례 검색 패턴 (도시계획·건축위원회는 광역 관할이라 제외)
+# 법제처 DB는 "{시도} {시군구} 건축 조례" 형태로 등록됨
+SIGUNGU_PATTERNS = [
+    "{sido} {sigungu} 건축 조례",
+    "{sido} {sigungu} 주차장 설치 및 관리 조례",
+]
+
 _REQ_INTERVAL = 0.5
 
 
@@ -80,10 +98,22 @@ def _get_title(root: ET.Element, fallback: str) -> str:
 
 # ── 조례 MST 검색 ─────────────────────────────────────────────────────────────
 
+def _ordin_fields(elem: ET.Element) -> tuple[str, str]:
+    """조례 검색 결과에서 (이름, MST) 추출.
+
+    법제처 DRF API는 target=ordin일 때 필드명이 국가법령과 다름:
+      이름: 자치법규명  (국가법령: 법령명한글)
+      MST : 자치법규일련번호  (국가법령: MST)
+    """
+    name = _t(elem.find("자치법규명")) or _t(elem.find("법령명한글"))
+    mst  = _t(elem.find("자치법규일련번호")) or _t(elem.find("MST"))
+    return name, mst
+
+
 def _find_mst(query: str, sido: str) -> tuple[str, str] | None:
     """조례명으로 (MST, 실제 법령명) 검색.
 
-    우선순위: 정확 일치 → 시도명을 포함한 첫 번째 결과.
+    우선순위: 정확 일치 → 시도/시군구명을 포함한 첫 번째 결과.
     둘 다 없으면 None.
     """
     data = _get(SEARCH_URL, {
@@ -103,16 +133,24 @@ def _find_mst(query: str, sido: str) -> tuple[str, str] | None:
 
     # 1순위: 정확 일치
     for elem in laws:
-        name = _t(elem.find("법령명한글"))
+        name, mst = _ordin_fields(elem)
         if name == query:
-            mst = _t(elem.find("MST"))
             return (mst, name) if mst else None
 
-    # 2순위: 시도명 포함 첫 번째 결과 (조례명 표기가 다소 다른 경우 대응)
+    # 2순위: 시도/시군구명 + 핵심 카테고리 단어 포함 (행정 지명어 제외)
+    _ADMIN_SUFFIXES = ("특별시", "광역시", "특별자치시", "특별자치도", "도", "구", "시", "군")
+    category_words = [
+        w for w in query.split()
+        if w != "조례" and w != sido
+        and not any(w.endswith(s) for s in _ADMIN_SUFFIXES)
+    ]
     for elem in laws:
-        name = _t(elem.find("법령명한글"))
-        if sido in name:
-            mst = _t(elem.find("MST"))
+        name, mst = _ordin_fields(elem)
+        if sido not in name:
+            continue
+        # 카테고리 단어가 단독 단어로 포함되어야 함 (공백 구분 기준)
+        name_words = set(name.replace("·", " ").replace("「", " ").replace("」", " ").split())
+        if any(w in name_words for w in category_words):
             return (mst, name) if mst else None
 
     return None
@@ -170,6 +208,33 @@ def _collect_unit(
     }
 
 
+def _parse_ordin_jo(root: ET.Element, title: str, source: str) -> dict[str, dict]:
+    """자치법규 서비스 XML 스키마: 조문/조 → 조문번호·조제목·조내용."""
+    seen: dict[str, dict] = {}
+    for 조 in root.findall("조문/조"):
+        if _t(조.find("조문여부")) == "N":
+            continue
+        번호_raw = _t(조.find("조문번호"))
+        제목 = _t(조.find("조제목"))
+        내용 = _t(조.find("조내용"))
+        if not 번호_raw or not 내용:
+            continue
+        try:
+            num = int(번호_raw) // 100
+        except ValueError:
+            continue
+        article_no = f"제{num}조({제목})" if 제목 else f"제{num}조"
+        seen[article_no] = {
+            "title":      title,
+            "article_no": article_no,
+            "content":    내용,
+            "law_type":   "ordinance",
+            "source":     source,
+            "fetched_at": FETCHED_AT,
+        }
+    return seen
+
+
 def _parse_ordinance(xml_bytes: bytes, title_fallback: str, source: str) -> list[dict]:
     try:
         root = ET.fromstring(xml_bytes)
@@ -180,6 +245,12 @@ def _parse_ordinance(xml_bytes: bytes, title_fallback: str, source: str) -> list
     title = _get_title(root, title_fallback)
     seen: dict[str, dict] = {}
 
+    # 자치법규 서비스 스키마 (조문/조)
+    if root.findall("조문/조"):
+        seen.update(_parse_ordin_jo(root, title, source))
+        return list(seen.values())
+
+    # 기존 국가법령 스키마 (조문/조문단위)
     for unit in root.findall("조문/조문단위"):
         row = _collect_unit(unit, "", title, source)
         if row:
@@ -257,47 +328,50 @@ def collect_rows(sido_filter: str | None = None) -> tuple[list[dict], list[str]]
     return all_rows, failures
 
 
-# ── 진입점 ────────────────────────────────────────────────────────────────────
-
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--dry-run", action="store_true", help="파싱 결과만 출력, DB 저장 안 함")
-    group.add_argument("--commit",  action="store_true", help="실제 DB 저장")
-    parser.add_argument("--sido", metavar="시도명", help="특정 시도만 수집 (예: 서울특별시)")
-    args = parser.parse_args()
-
-    if not LAW_API_KEY:
-        print("오류: LAW_API_KEY 환경변수가 설정되지 않았습니다. .env를 확인하세요.")
+def collect_sigungu_rows(sido_filter: str | None = None) -> tuple[list[dict], list[str]]:
+    """시군구 단위 조례 수집. 반환: (rows, failure_logs)"""
+    if sido_filter and sido_filter not in SIGUNGU_BY_SIDO:
+        print(f"오류: '{sido_filter}'의 시군구 목록이 없습니다.")
+        print(f"지원 시도: {', '.join(SIGUNGU_BY_SIDO.keys())}")
         sys.exit(1)
 
-    targets_n  = 1 if args.sido else len(SIDO_LIST)
-    sido_label = f" ({args.sido})" if args.sido else ""
-    print(f"수집 대상: {targets_n}개 시도 × {len(ORDIN_PATTERNS)}개 조례 패턴{sido_label}\n")
+    targets: list[tuple[str, str]] = []  # (sido, sigungu)
+    for sido, gulist in SIGUNGU_BY_SIDO.items():
+        if sido_filter is None or sido == sido_filter:
+            for gu in gulist:
+                targets.append((sido, gu))
 
-    all_rows, failures = collect_rows(args.sido)
+    all_rows: list[dict] = []
+    failures: list[str]  = []
+    total = len(targets) * len(SIGUNGU_PATTERNS)
+    done  = 0
 
-    # 실패 요약
-    if failures:
-        print(f"\n{'─'*60}")
-        print(f"수집 실패 / 결과 없음 ({len(failures)}건):")
-        for f in failures:
-            print(f"  {f}")
+    for sido, sigungu in targets:
+        for pattern in SIGUNGU_PATTERNS:
+            query = pattern.format(sido=sido, sigungu=sigungu)
+            done += 1
+            print(f"  [{done:>3}/{total}] {query}")
+            try:
+                rows = fetch_ordinance(query, sigungu)
+            except RuntimeError as e:
+                msg = f"{query} — {e}"
+                print(f"    수집 실패: {msg}")
+                failures.append(f"[수집 실패] {msg}")
+                continue
 
-    if args.dry_run:
-        by_law: dict[str, int] = {}
-        for r in all_rows:
-            by_law[r["title"]] = by_law.get(r["title"], 0) + 1
-        print(f"\n파싱 결과 (DB 저장 안 함):")
-        print(f"  전체: {len(all_rows)}건")
-        for law, cnt in by_law.items():
-            print(f"  {law}: {cnt}건")
-        return
+            if rows:
+                print(f"    조문 {len(rows)}개")
+                all_rows.extend(rows)
+            else:
+                print(f"    검색 결과 없음")
+                failures.append(f"[결과 없음] {query}")
 
-    if not all_rows:
-        print("\n적재할 조문이 없습니다.")
-        return
+    return all_rows, failures
 
+
+# ── 진입점 ────────────────────────────────────────────────────────────────────
+
+def _save_to_db(all_rows: list[dict]) -> None:
     init_db()
     conn = get_connection()
     try:
@@ -320,6 +394,56 @@ def main() -> None:
         print(f"\n완료: {len(new_rows)}건 적재, {len(all_rows) - len(new_rows)}건 건너뜀")
     finally:
         conn.close()
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--dry-run", action="store_true", help="파싱 결과만 출력, DB 저장 안 함")
+    group.add_argument("--commit",  action="store_true", help="실제 DB 저장")
+    parser.add_argument("--sido",    metavar="시도명",   help="특정 시도만 수집 (예: 서울특별시)")
+    parser.add_argument("--sigungu", metavar="시도명",   help="시군구 단위 수집 (예: 서울특별시)")
+    args = parser.parse_args()
+
+    if not LAW_API_KEY:
+        print("오류: LAW_API_KEY 환경변수가 설정되지 않았습니다. .env를 확인하세요.")
+        sys.exit(1)
+
+    if "--sigungu" in sys.argv:
+        # 시군구 모드
+        sido_filter = args.sigungu or None
+        label = f" ({sido_filter} 시군구)" if sido_filter else " (전체 시군구)"
+        gucount = len(SIGUNGU_BY_SIDO.get(sido_filter, [])) if sido_filter else sum(len(v) for v in SIGUNGU_BY_SIDO.values())
+        print(f"수집 대상: {gucount}개 시군구 × {len(SIGUNGU_PATTERNS)}개 조례 패턴{label}\n")
+        all_rows, failures = collect_sigungu_rows(sido_filter)
+    else:
+        # 광역시·도 모드 (기존)
+        targets_n  = 1 if args.sido else len(SIDO_LIST)
+        sido_label = f" ({args.sido})" if args.sido else ""
+        print(f"수집 대상: {targets_n}개 시도 × {len(ORDIN_PATTERNS)}개 조례 패턴{sido_label}\n")
+        all_rows, failures = collect_rows(args.sido)
+
+    if failures:
+        print(f"\n{'─'*60}")
+        print(f"수집 실패 / 결과 없음 ({len(failures)}건):")
+        for f in failures:
+            print(f"  {f}")
+
+    if args.dry_run:
+        by_law: dict[str, int] = {}
+        for r in all_rows:
+            by_law[r["title"]] = by_law.get(r["title"], 0) + 1
+        print(f"\n파싱 결과 (DB 저장 안 함):")
+        print(f"  전체: {len(all_rows)}건")
+        for law, cnt in by_law.items():
+            print(f"  {law}: {cnt}건")
+        return
+
+    if not all_rows:
+        print("\n적재할 조문이 없습니다.")
+        return
+
+    _save_to_db(all_rows)
 
 
 if __name__ == "__main__":
