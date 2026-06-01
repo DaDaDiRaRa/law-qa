@@ -124,12 +124,34 @@ def _search_laws(question: str) -> list[dict]:
         conn.close()
 
 
+_HINT_MAP: dict[str, list[str]] = {
+    "주차": ["주차장", "주차 기준", "주차 대수"],
+    "높이": ["가로구역", "일조권", "사선제한"],
+    "조경": ["조경 의무", "식재 기준", "대지면적"],
+    "에너지": ["에너지절약계획서", "ZEB", "녹색건축"],
+    "용적률": ["용적률 완화", "녹색건축 인증", "공개공지"],
+}
+
+
+def _build_not_found_message(question: str) -> str:
+    hints: list[str] = []
+    for key, suggestions in _HINT_MAP.items():
+        if key in question:
+            hints.extend(suggestions)
+    if hints:
+        return (
+            "현재 DB에서 관련 조문을 찾을 수 없습니다.\n"
+            f"관련 키워드로 다시 질문해보세요: {', '.join(hints)}"
+        )
+    return "현재 DB에서 관련 조문을 찾을 수 없습니다. 확인 불가."
+
+
 def answer(question: str, image_base64: str | None = None) -> dict:
     laws = _search_laws(question)
 
     if not laws:
         return {
-            "answer": "현재 DB에서 관련 조문을 찾을 수 없습니다. 확인 불가.",
+            "answer": _build_not_found_message(question),
             "source_laws": [],
             "source_law_ids": [],
             "confidence": None,
