@@ -32,19 +32,58 @@ _PARTICLE = re.compile(
     r'(?:에서는|이에요|인가요|이라는|이라고|에서도|으로는|로서는|에서|이며|이고|이나|에는|에도|으로|이야|이란|한테|부터|까지|처럼|만큼|보다|의|은|는|이|가|을|를|와|과|도|로|에|야)$'
 )
 
+# 용도지역 복합어 — 공백 분리 전에 선추출하여 단일 토큰으로 보호
+# 긴 것 먼저 배치해야 "제1종전용주거지역"이 "제1종"+"전용주거지역"으로 쪼개지지 않음
+_ZONE_NAMES = sorted([
+    "제1종전용주거지역", "제2종전용주거지역",
+    "제1종일반주거지역", "제2종일반주거지역", "제3종일반주거지역",
+    "준주거지역",
+    "중심상업지역", "일반상업지역", "근린상업지역", "유통상업지역",
+    "전용공업지역", "일반공업지역", "준공업지역",
+    "보전녹지지역", "생산녹지지역", "자연녹지지역",
+    "계획관리지역", "생산관리지역", "보전관리지역",
+    "농림지역", "자연환경보전지역",
+], key=len, reverse=True)
+_ZONE_RE = re.compile("|".join(re.escape(z) for z in _ZONE_NAMES))
+
+# 법령 도메인 동의어 — 양방향 매핑으로 사전 구축
+_SYNONYM_GROUPS: list[set[str]] = [
+    {"건폐율", "건축면적비율"},
+    {"용적률", "연면적비율"},
+    {"ZEB", "제로에너지건축물"},
+    {"녹건", "녹색건축"},
+]
+_SYNONYM_MAP: dict[str, set[str]] = {}
+for _g in _SYNONYM_GROUPS:
+    for _t in _g:
+        _SYNONYM_MAP[_t] = _g - {_t}
+
 
 def _tokenize(text: str) -> list[str]:
-    """공백/구두점으로 분리 → 조사 제거 변형도 추가."""
-    raw = re.split(r'[\s\?!,.·「」『』【】\(\)]+', text)
     seen: set[str] = set()
     result: list[str] = []
-    for w in raw:
+
+    def _add(tok: str) -> None:
+        if len(tok) >= 2 and tok not in seen:
+            seen.add(tok)
+            result.append(tok)
+            for syn in _SYNONYM_MAP.get(tok, ()):
+                if len(syn) >= 2 and syn not in seen:
+                    seen.add(syn)
+                    result.append(syn)
+
+    # 1단계: 용도지역명 복합어 선추출 (분리 방지)
+    for z in _ZONE_RE.findall(text):
+        _add(z)
+    remaining = _ZONE_RE.sub(" ", text)
+
+    # 2단계: 나머지 텍스트 공백/구두점 분리 + 조사 제거 변형 추가
+    for w in re.split(r'[\s\?!,.·「」『』【】\(\)]+', remaining):
         if len(w) < 2:
             continue
-        for candidate in (w, _PARTICLE.sub("", w)):
-            if len(candidate) >= 2 and candidate not in seen:
-                seen.add(candidate)
-                result.append(candidate)
+        _add(w)
+        _add(_PARTICLE.sub("", w))
+
     return result
 
 
