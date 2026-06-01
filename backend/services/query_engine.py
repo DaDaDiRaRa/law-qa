@@ -13,7 +13,7 @@ load_dotenv(_BACKEND.parent / ".env")
 import anthropic
 from services.db_manager import get_connection
 
-_MODEL = "claude-sonnet-4-5"
+_MODEL = "claude-sonnet-4-6"
 _TOP_K = 5
 
 _SYSTEM = """당신은 건축법규 전문 AI 어시스턴트입니다. 반드시 아래 규칙을 따르세요.
@@ -120,9 +120,11 @@ def answer(question: str, image_base64: str | None = None) -> dict:
         messages=[{"role": "user", "content": user_content}],
     )
 
+    answer_text = response.content[0].text
+    confirmed = "확인 불가" not in answer_text
     return {
-        "answer": response.content[0].text + _DISCLAIMER,
-        "source_laws": laws,
-        "source_law_ids": [law["id"] for law in laws],
+        "answer": answer_text + _DISCLAIMER,
+        "source_laws": laws if confirmed else [],
+        "source_law_ids": [law["id"] for law in laws] if confirmed else [],
         "confidence": None,
     }

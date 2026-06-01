@@ -70,7 +70,7 @@ export default function ChatWindow({ project, onBack }) {
         {
           role: 'assistant',
           text: data.answer,
-          sourceLaws: data.source_laws ?? [],
+          sourceLaws: data.source_law_ids ?? [],
           confidence: data.confidence,
           id: data.history_id,
         },

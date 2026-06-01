@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timezone
 
 from services.db_manager import get_connection
@@ -61,26 +62,35 @@ def get_by_project(project_id: int, limit: int = 50) -> list[dict]:
 
 
 def search(query: str, project_id: int | None = None, limit: int = 20) -> list[dict]:
-    # FTS5 특수문자 회피: 검색어 전체를 구문 검색으로 처리
-    fts_query = '"' + query.replace('"', '""') + '"'
+    tokens = [t for t in re.split(r'[\s\?!,.·「」【】\(\)]+', query) if len(t) >= 2]
+    if not tokens:
+        return []
+
     conn = get_connection()
     try:
-        if project_id is not None:
-            rows = conn.execute(
-                "SELECT qh.* FROM query_history_fts f "
-                "JOIN query_history qh ON qh.id = f.rowid "
-                "WHERE query_history_fts MATCH ? AND qh.project_id = ? "
-                "ORDER BY rank LIMIT ?",
-                (fts_query, project_id, limit),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT qh.* FROM query_history_fts f "
-                "JOIN query_history qh ON qh.id = f.rowid "
-                "WHERE query_history_fts MATCH ? "
-                "ORDER BY rank LIMIT ?",
-                (fts_query, limit),
-            ).fetchall()
+        def _run(fts_q: str) -> list:
+            try:
+                if project_id is not None:
+                    return conn.execute(
+                        "SELECT qh.* FROM query_history_fts f "
+                        "JOIN query_history qh ON qh.id = f.rowid "
+                        "WHERE query_history_fts MATCH ? AND qh.project_id = ? "
+                        "ORDER BY rank LIMIT ?",
+                        (fts_q, project_id, limit),
+                    ).fetchall()
+                return conn.execute(
+                    "SELECT qh.* FROM query_history_fts f "
+                    "JOIN query_history qh ON qh.id = f.rowid "
+                    "WHERE query_history_fts MATCH ? "
+                    "ORDER BY rank LIMIT ?",
+                    (fts_q, limit),
+                ).fetchall()
+            except Exception:
+                return []
+
+        rows = _run(" ".join(f'"{t}"' for t in tokens))
+        if not rows and len(tokens) > 1:
+            rows = _run(" OR ".join(f'"{t}"' for t in tokens))
         return [_row_to_dict(r) for r in rows]
     finally:
         conn.close()

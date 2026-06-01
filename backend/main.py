@@ -13,7 +13,7 @@ if str(_BACKEND) not in sys.path:
 from services.db_manager import init_db
 from services import project_manager as pm
 from services import history_manager as hm
-from services import query_engine as qe  # query_engine.py 구현 후 활성화
+from services import query_engine as qe
 
 
 @asynccontextmanager
@@ -59,6 +59,7 @@ def run_query(req: QueryRequest):
     return {
         "answer": result["answer"],
         "source_laws": result.get("source_laws", []),
+        "source_law_ids": result.get("source_law_ids", []),
         "confidence": result.get("confidence"),
         "history_id": history["id"],
     }
