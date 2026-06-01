@@ -1,16 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
 
-export default function ChatWindow({ project, onBack }) {
+export default function ChatWindow({ project, onProjectChange }) {
   const [question, setQuestion] = useState('')
-  const [image, setImage] = useState(null)  // { file, base64 }
+  const [image, setImage] = useState(null)
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [projects, setProjects] = useState([])
   const bottomRef = useRef(null)
   const fileRef = useRef(null)
 
-  // 이전 히스토리 로드
   useEffect(() => {
+    fetch('/api/projects')
+      .then(r => r.ok ? r.json() : [])
+      .then(setProjects)
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    setMessages([])
     fetch(`/api/projects/${project.id}/history`)
       .then(r => r.json())
       .then(rows => {
@@ -86,15 +94,21 @@ export default function ChatWindow({ project, onBack }) {
     <div className="flex flex-col h-[calc(100vh-56px)] max-w-3xl mx-auto w-full">
       {/* 서브 헤더 */}
       <div className="px-4 py-3 border-b border-slate-200 bg-white flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className="text-slate-500 hover:text-slate-800 text-sm transition-colors"
+        <span className="text-xs text-slate-400 shrink-0">프로젝트</span>
+        <select
+          value={project.id}
+          onChange={e => {
+            const p = projects.find(p => p.id === Number(e.target.value))
+            if (p) onProjectChange(p)
+          }}
+          className="flex-1 min-w-0 border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-800 bg-white outline-none focus:ring-2 focus:ring-slate-400 cursor-pointer"
         >
-          ← 목록
-        </button>
-        <span className="text-slate-800 font-medium truncate">{project.name}</span>
+          {projects.map(p => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
         {project.description && (
-          <span className="text-sm text-slate-400 truncate hidden sm:block">{project.description}</span>
+          <span className="text-sm text-slate-400 truncate hidden sm:block shrink-0">{project.description}</span>
         )}
       </div>
 
