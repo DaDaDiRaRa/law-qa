@@ -59,7 +59,33 @@ for _g in _SYNONYM_GROUPS:
         _SYNONYM_MAP[_t] = _g - {_t}
 
 
+# 토크나이징 전 텍스트 정규화 규칙
+# 부정 전방탐색으로 이미 정식 명칭이 있는 경우 중복 치환 방지
+_NORM_RULES: list[tuple[re.Pattern, str]] = [
+    # 지자체명 축약 → 공식 명칭
+    (re.compile(r'서울(?!특별시)(?:시|(?=[ \n]|$))'), '서울특별시'),
+    (re.compile(r'부산(?!광역시)(?:시|(?=[ \n]|$))'), '부산광역시'),
+    (re.compile(r'대구(?!광역시)(?:시|(?=[ \n]|$))'), '대구광역시'),
+    (re.compile(r'인천(?!광역시)(?:시|(?=[ \n]|$))'), '인천광역시'),
+    (re.compile(r'광주(?!광역시)(?:시|(?=[ \n]|$))'), '광주광역시'),
+    (re.compile(r'대전(?!광역시)(?:시|(?=[ \n]|$))'), '대전광역시'),
+    (re.compile(r'울산(?!광역시)(?:시|(?=[ \n]|$))'), '울산광역시'),
+    (re.compile(r'경기(?!도)(?=[ \n]|$)'), '경기도'),
+    # 법령 축약어 → 정식 용어
+    (re.compile(r'건폐(?!율)'), '건폐율'),
+    (re.compile(r'용적(?!률)'), '용적률'),
+    (re.compile(r'(?i)ZEB(?![a-zA-Z])'), '제로에너지건축물'),
+]
+
+
+def _normalize(text: str) -> str:
+    for pattern, repl in _NORM_RULES:
+        text = pattern.sub(repl, text)
+    return text
+
+
 def _tokenize(text: str) -> list[str]:
+    text = _normalize(text)
     seen: set[str] = set()
     result: list[str] = []
 
