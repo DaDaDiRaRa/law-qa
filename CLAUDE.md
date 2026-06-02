@@ -163,18 +163,34 @@ LLM 시스템 프롬프트 (`_SYSTEM`) 특이사항:
 
 오류 시 각 단계별 한국어 에러메시지 반환. 실패해도 query_engine 기본 흐름 유지.
 
-> ⚠️ **현재 알려진 이슈 (2026-06-01 기준)**
+> ⚠️ **현재 알려진 이슈 (2026-06-02 기준) — 용도지역 자동 조회 불가**
 >
-> LURIS API(`luris.molit.go.kr`)가 SSL 인증서 호스트명 불일치 + 403 Forbidden으로 **용도지역 자동 조회 불가**.
-> SSL 우회(`_SSL_CTX`)는 적용했으나 403은 서버 측 IP 차단 또는 키 만료로 추정.
+> **조사 완료된 API 현황:**
 >
-> - `LURIS_API_KEY`: 403 반환 중 (모든 엔드포인트 실패)
-> - `VWORLD_API_KEY`: WFS 접근 권한 없음 (INCORRECT_KEY)
+> | API | 상태 | 원인 |
+> |---|---|---|
+> | `LURIS_API_KEY` (`luris.molit.go.kr`) | ❌ 403 Forbidden | 서버 측 IP 차단 또는 키 만료. SSL 우회(`_SSL_CTX`) 적용됨 |
+> | `VWORLD_API_KEY` — 검색(search) | ✅ 정상 | 개발키에 검색 서비스 등록됨 |
+> | `VWORLD_API_KEY` — WFS/WMS/데이터 | ❌ INCORRECT_KEY | 개발키(테스트키)는 search만 허용. WFS·req/data는 운영키 필요 |
+> | `arLandUseInfoService` (data.go.kr/1613000) | ✅ API 연결 정상 | 단, 용도지역코드를 입력받아 행위제한 반환하는 API — 주소→용도지역 역방향 조회 불가 |
+> | data.go.kr 1611000 WFS | ❌ HTTP 500 | 서비스 자체 오류 |
 >
-> **해결 방법**: 공공데이터포털(`data.go.kr`) → "토지이용규제서비스" 검색 → 활용신청 → 새 `serviceKey` 발급 후 `.env`의 `LURIS_API_KEY`에 교체.
+> **진행 중인 해결:**
 >
-> 그 전까지는 주소만으로는 기본 정보 질문을 완전히 처리할 수 없음.
-> query_engine이 zone_use 없을 때 "용도지역을 직접 포함해서 재질문" 안내를 반환하도록 처리해 둠.
+> VWorld **운영키 신청 완료** (2026-06-02). 심사 후 승인 시 (보통 1~3 영업일) WFS·2D데이터 API 사용 가능.
+> → 승인되면 `land_info.py`에 VWorld `req/data` 연동 즉시 구현:
+> ```
+> GET https://api.vworld.kr/req/data
+>   ?service=data&version=2.0&request=GetFeature
+>   &data=LT_C_UQ111&geomFilter=POINT({lng} {lat})
+>   &format=json&size=1&key=VWORLD_API_KEY
+> ```
+> 응답의 `prposArea` 필드 → `zone_use` 매핑.
+>
+> **대기 중 병행 시도:**
+> data.go.kr "토지특성정보서비스" — LURIS_API_KEY(기존 키)로 PNU → 용도지역 조회 가능 여부 미확인. 테스트 예정.
+>
+> **현재 폴백:** query_engine이 zone_use 없을 때 "용도지역을 직접 포함해서 재질문" 안내 반환.
 
 ---
 
@@ -185,7 +201,7 @@ ANTHROPIC_API_KEY=sk-ant-...    # 필수
 LAW_API_KEY=...                 # 법제처 DRF API
 KAKAO_API_KEY=...               # 카카오 로컬 API (주소→좌표) — 정상 작동
 LURIS_API_KEY=...               # LURIS 행위제한 API (용도지역 조회) — ⚠️ 현재 403 오류
-VWORLD_API_KEY=...              # VWorld — ⚠️ WFS 접근 권한 없음
+VWORLD_API_KEY=...              # VWorld — ⚠️ 운영키 심사 중 (2026-06-02 신청). 승인 후 WFS·데이터 API 사용 가능
 TOJI_API_KEY=...                # 토지이음 API (미설정)
 ROAD_API_KEY=...                # 행안부 도로명주소 API (미설정)
 DB_PATH=./data/law_qa.db
@@ -333,13 +349,15 @@ law-qa/
 - [x] 출처 조문 토글 표시
 - [x] 기본 프로젝트 자동 생성 (빠른 질의 모드)
 - [x] FTS 검색 품질 개선 (정규화·동의어·복합어)
+- [x] LLM 답변 말투 개선 — "선배 건축사" 페르소나, 대화체, 확인불가 시 추가설명 금지
 - [x] 확인 불가 시 힌트 키워드 제안
 - [x] 법제처 API 수집 스크립트 3종
-- [x] 주소 감지 + LURIS 용도지역 자동 조회 (land_info.py) — API 키 갱신 필요 (현재 불가)
+- [x] 주소 감지 파이프라인 구축 (land_info.py) — 카카오 → PNU까지 정상, 용도지역 API 대기 중
+- [x] VWorld API 조사 — 개발키·운영키 구분 확인, 운영키 신청 완료 (2026-06-02)
 
 ---
 
-### Phase 1 — 주소 기반 대지 조회 (부분 완료)
+### Phase 1 — 주소 기반 대지 조회 (부분 완료, 용도지역 API 대기 중)
 
 - [x] `GET /api/land-info?address=...` 엔드포인트 main.py에 추가
 - [x] 질문 텍스트 내 주소 패턴 자동 감지 → 용도지역 조회 → FTS 토큰·LLM 프롬프트 자동 반영
@@ -348,8 +366,11 @@ law-qa/
 - [x] 주소 추출 정확도 개선: 정규화 후 패턴 검색, 시/도 접두어 역탐색, 번지 패턴 확장
 - [x] 기본정보 질문 시 건폐율·용적률 등 법규 키워드 FTS 자동 추가
 - [x] zone_use 조회 실패 시 LLM 호출 없이 "용도지역 직접 포함해서 재질문" 안내
-- [ ] **LURIS API 키 갱신 필요** — 현재 용도지역 자동 조회 불가
-      data.go.kr → "토지이용규제서비스" → 새 serviceKey 발급 후 .env 교체
+- [x] VWorld API 조사 완료 — 개발키는 search만 허용, 운영키 필요
+- [ ] **[대기] VWorld 운영키 승인 후** → `land_info.py`에 VWorld `req/data` 연동
+      승인 확인 후 코드 구현 즉시 가능 (엔드포인트·파라미터 확정됨)
+- [ ] **[병행 시도] data.go.kr 토지특성정보서비스** — 기존 LURIS_API_KEY로 PNU → 용도지역 조회 가능 여부 테스트
+      가능하면 VWorld 승인 전에도 용도지역 조회 구현 가능
 
 ---
 
