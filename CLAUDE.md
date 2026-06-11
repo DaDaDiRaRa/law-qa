@@ -178,7 +178,7 @@ LLM 시스템 프롬프트 (`_SYSTEM`) 특이사항:
 >
 > **진행 중인 해결:**
 >
-> VWorld **운영키 신청 완료** (2026-06-02). 심사 후 승인 시 (보통 1~3 영업일) WFS·2D데이터 API 사용 가능.
+> VWorld **운영키 신청 완료** (2026-06-02 신청, 2026-06-11 기준 승인 미확인). 승인 후 WFS·2D데이터 API 사용 가능.
 > → 승인되면 `land_info.py`에 VWorld `req/data` 연동 즉시 구현:
 > ```
 > GET https://api.vworld.kr/req/data
@@ -262,10 +262,10 @@ python -m scripts.fetch_supplementary --dry-run
 python -m scripts.fetch_supplementary --commit                  # 부수법령 (1,345건 적재 완료)
 
 python -m scripts.fetch_precedents --dry-run
-python -m scripts.fetch_precedents --commit                     # 법령해석례·판례 (건축법 키워드 4종)
+python -m scripts.fetch_precedents --commit                     # 법령해석례·판례 (939건 적재 완료)
 ```
 
-### 현재 DB 적재 현황 (2026-06-02 기준)
+### 현재 DB 적재 현황 (2026-06-11 기준)
 
 | law_type | 건수 | 내용 |
 |---|---|---|
@@ -358,7 +358,7 @@ law-qa/
 - [x] FTS 검색 품질 개선 (정규화·동의어·복합어)
 - [x] LLM 답변 말투 개선 — "선배 건축사" 페르소나, 대화체, 확인불가 시 추가설명 금지
 - [x] 확인 불가 시 힌트 키워드 제안
-- [x] 법제처 API 수집 스크립트 3종
+- [x] 법제처 API 수집 스크립트 4종 (fetch_laws·fetch_ordinances·fetch_supplementary·fetch_precedents)
 - [x] 주소 감지 파이프라인 구축 (land_info.py) — 카카오 → PNU까지 정상, 용도지역 API 대기 중
 - [x] VWorld API 조사 — 개발키·운영키 구분 확인, 운영키 신청 완료 (2026-06-02)
 
@@ -394,7 +394,7 @@ law-qa/
 
 ---
 
-### Phase 3 — 데이터 보강 (진행 중)
+### Phase 3 — 데이터 보강 (법령·판례 수집 완료, 세움터 연동 대기)
 
 - [x] 시군구 단위 조례 수집 — 서울 25개 자치구 주차장 조례 991건 완료
 - [x] 핵심 국가법령 수집 완료 — 건축법·시행령·시행규칙, 국토계획법·시행령, 주차장법·시행령 917건
