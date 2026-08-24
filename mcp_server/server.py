@@ -141,9 +141,20 @@ if __name__ == "__main__":
         mcp.run("stdio")
     else:
         import uvicorn
-        from starlette.responses import PlainTextResponse
+        from starlette.responses import JSONResponse, PlainTextResponse
 
         _MCP_SHARED_KEY = os.environ.get("LAW_QA_MCP_KEY")
+
+        # "/" 는 인증 없이 공개한다 — VWorld 등 외부 API 심사자가 "실제 서비스가 맞는지"
+        # URL을 직접 열어보는데, 전체를 인증으로 막아두면(초기 버전이 그랬다) 방문자에게
+        # 401만 보여서 "실사용 서비스가 아니다" 로 비칠 수 있다. 도구 자체(/mcp)는 여전히
+        # 인증이 걸려 있다 — 여기서 노출하는 건 서비스 설명뿐, 기능은 아니다.
+        _PUBLIC_INFO = {
+            "service": "law-qa MCP",
+            "description": "건축법규 자연어 질의·용도지역 조회·법규 종합 검토 — Claude Code 용 MCP 서버.",
+            "mcp_endpoint": "/mcp",
+            "auth": "Bearer token required on /mcp — 문의: 김정현",
+        }
 
         class _AuthMiddleware:
             def __init__(self, app):
@@ -152,6 +163,11 @@ if __name__ == "__main__":
             async def __call__(self, scope, receive, send):
                 if scope["type"] != "http":
                     await self._app(scope, receive, send)
+                    return
+                path = scope["path"]
+                if path in ("/", "/health"):
+                    resp = JSONResponse(_PUBLIC_INFO)
+                    await resp(scope, receive, send)
                     return
                 headers = dict(scope.get("headers") or [])
                 token = headers.get(b"authorization", b"").decode("latin-1")
