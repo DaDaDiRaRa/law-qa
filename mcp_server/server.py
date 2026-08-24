@@ -141,7 +141,7 @@ if __name__ == "__main__":
         mcp.run("stdio")
     else:
         import uvicorn
-        from starlette.responses import JSONResponse, PlainTextResponse
+        from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse
 
         _MCP_SHARED_KEY = os.environ.get("LAW_QA_MCP_KEY")
 
@@ -149,6 +149,30 @@ if __name__ == "__main__":
         # URL을 직접 열어보는데, 전체를 인증으로 막아두면(초기 버전이 그랬다) 방문자에게
         # 401만 보여서 "실사용 서비스가 아니다" 로 비칠 수 있다. 도구 자체(/mcp)는 여전히
         # 인증이 걸려 있다 — 여기서 노출하는 건 서비스 설명뿐, 기능은 아니다.
+        # "/" 는 사람이 브라우저로 확인하니 HTML, "/health" 는 기계용이라 JSON 그대로 둔다.
+        _PUBLIC_HTML = """<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>law-qa MCP</title>
+<style>
+  body{font-family:-apple-system,"Malgun Gothic",sans-serif;max-width:640px;
+       margin:80px auto;padding:0 24px;color:#1a1a1a;line-height:1.6}
+  h1{font-size:22px;margin-bottom:4px}
+  .badge{display:inline-block;background:#eef2ff;color:#4f46e5;font-size:12px;
+         padding:2px 8px;border-radius:4px;margin-bottom:16px}
+  code{background:#f4f4f5;padding:2px 6px;border-radius:4px;font-size:13px}
+  .meta{color:#666;font-size:14px;margin-top:24px}
+</style></head><body>
+  <span class="badge">MCP 서버</span>
+  <h1>law-qa — 건축법규 Q&amp;A</h1>
+  <p>건축법규 자연어 질의 · 용도지역 조회 · 건폐율/용적률/주차/높이/조경 종합 검토를
+     Claude Code(및 다른 MCP 호스트)에서 직접 호출하는 서버입니다.</p>
+  <p class="meta">
+    엔드포인트: <code>/mcp</code> (Bearer 토큰 인증 필요)<br>
+    사용기관: 종합건축사사무소 건원 — 사내 전용, 외부 판매 없음<br>
+    문의: 김정현
+  </p>
+</body></html>"""
+
         _PUBLIC_INFO = {
             "service": "law-qa MCP",
             "description": "건축법규 자연어 질의·용도지역 조회·법규 종합 검토 — Claude Code 용 MCP 서버.",
@@ -165,7 +189,11 @@ if __name__ == "__main__":
                     await self._app(scope, receive, send)
                     return
                 path = scope["path"]
-                if path in ("/", "/health"):
+                if path == "/":
+                    resp = HTMLResponse(_PUBLIC_HTML)
+                    await resp(scope, receive, send)
+                    return
+                if path == "/health":
                     resp = JSONResponse(_PUBLIC_INFO)
                     await resp(scope, receive, send)
                     return
