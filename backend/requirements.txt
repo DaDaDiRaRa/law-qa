@@ -1,5 +1,5 @@
 fastapi>=0.111.0
 uvicorn[standard]>=0.29.0
-anthropic>=0.25.0
+anthropic>=1,<2        # 1.x 로 명시 핀 — messages.create() 가 temperature 를 직접 안 받는다(위 참조)
 python-dotenv>=1.0.0
-mcp>=1.0.0
+mcp>=1.0.0,<2.0.0     # 2.0.0 은 mcp.server.fastmcp 를 없앤다 — 실측(kunwon-ops docs/plan-mcp-gateway.md §9)

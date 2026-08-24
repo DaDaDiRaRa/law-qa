@@ -15,6 +15,7 @@ backend/services/ 를 직접 import — 서비스 로직 변경 시 MCP 도구�
 - compliance_report : 건폐율·용적률·주차·높이·조경 5개 항목 종합 검토
 """
 
+import os
 import sys
 from pathlib import Path
 from typing import Optional
@@ -28,12 +29,20 @@ from dotenv import load_dotenv
 load_dotenv(_ROOT / ".env")
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from services.query_engine      import answer     as _qe_answer
 from services.land_info         import get_land_info as _get_land_info
 from services.compliance_engine import check      as _ce_check
 
-mcp = FastMCP("law-qa")
+# stateless_http・DNS 리바인딩 방지 끄기 — arch-site-model/터읽기 배포에서 확인한 것과
+# 같은 이유(kunwon-ops docs/plan-mcp-gateway.md §9). 이 서버는 독립 서비스라(다른 앱에
+# mount 되지 않는다) streamable_http_path 는 기본값 "/mcp" 그대로 둔다.
+mcp = FastMCP(
+    "law-qa",
+    stateless_http=True,
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+)
 
 
 @mcp.tool()
@@ -123,4 +132,35 @@ def compliance_report(
 
 
 if __name__ == "__main__":
-    mcp.run()
+    # 기본은 stdio(로컬 Claude Code). 컨테이너에서는 MCP_TRANSPORT=streamable-http 로 띄운다
+    # — 독립 서비스라 다른 앱에 얹을 필요가 없어 arch-law-graph-mcp 와 같은 형태다.
+    # 인증(Bearer 토큰)은 FastMCP 바깥에서 직접 wrap 한다 — search_laws/get_land_info/
+    # compliance_report 호출마다 ANTHROPIC_API_KEY·KAKAO·LURIS 요금이 나가서 막아야 한다
+    # (판단 근거: kunwon-ops 저장소 docs/plan-mcp-gateway.md §7).
+    if os.getenv("MCP_TRANSPORT", "stdio") == "stdio":
+        mcp.run("stdio")
+    else:
+        import uvicorn
+        from starlette.responses import PlainTextResponse
+
+        _MCP_SHARED_KEY = os.environ.get("LAW_QA_MCP_KEY")
+
+        class _AuthMiddleware:
+            def __init__(self, app):
+                self._app = app
+
+            async def __call__(self, scope, receive, send):
+                if scope["type"] != "http":
+                    await self._app(scope, receive, send)
+                    return
+                headers = dict(scope.get("headers") or [])
+                token = headers.get(b"authorization", b"").decode("latin-1")
+                expected = f"Bearer {_MCP_SHARED_KEY}" if _MCP_SHARED_KEY else None
+                if not expected or token != expected:
+                    resp = PlainTextResponse("Unauthorized", status_code=401)
+                    await resp(scope, receive, send)
+                    return
+                await self._app(scope, receive, send)
+
+        _app = _AuthMiddleware(mcp.streamable_http_app())
+        uvicorn.run(_app, host="0.0.0.0", port=int(os.environ.get("PORT", "8080")))

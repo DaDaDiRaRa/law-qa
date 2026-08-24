@@ -275,7 +275,11 @@ def answer(question: str, image_base64: str | None = None, land_info: dict | Non
     response = _get_client().messages.create(
         model=_MODEL,
         max_tokens=1024,
-        temperature=0,
+        # anthropic 1.x 는 messages.create() 가 temperature 를 직접 안 받는다
+        # (SDK 0.x→1.x 업그레이드, kunwon-ops docs/plan-mcp-gateway.md §11 실측).
+        # claude-sonnet-4-6 은 여전히 온도 파라미터를 받는 모델이고, 이 앱은 법령 답변의
+        # 결정성을 위해 0 에 의존하므로(환각 차단 원칙) extra_body 로 그대로 전달한다.
+        extra_body={"temperature": 0},
         system=_SYSTEM,
         messages=[{"role": "user", "content": user_content}],
     )

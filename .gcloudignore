@@ -1,0 +1,5 @@
+# gcloud run deploy --source 는 기본적으로 .gitignore 를 그대로 소스 업로드 필터로 쓴다.
+# .gitignore 의 backend/data/*.db 는 "DB는 로컬 생성물이라 git에 안 올린다"는 의도였지만,
+# law-qa-mcp 배포는 이 DB 를 이미지에 읽기 전용으로 넣어야 해서(§10) 그 규칙만 예외로 되살린다.
+#!include:.gitignore
+!backend/data/law_qa.db
